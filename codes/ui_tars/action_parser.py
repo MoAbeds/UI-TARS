@@ -410,13 +410,13 @@ def parsing_response_to_pyautogui_code(responses,
             if content:
                 if input_swap:
                     pyautogui_code += f"\nimport pyperclip"
-                    pyautogui_code += f"\npyperclip.copy('{stripped_content}')"
+                    pyautogui_code += f"\npyperclip.copy({repr(stripped_content)})"
                     pyautogui_code += f"\npyautogui.hotkey('ctrl', 'v')"
                     pyautogui_code += f"\ntime.sleep(0.5)\n"
                     if content.endswith("\n") or content.endswith("\\n"):
                         pyautogui_code += f"\npyautogui.press('enter')"
                 else:
-                    pyautogui_code += f"\npyautogui.write('{stripped_content}', interval=0.1)"
+                    pyautogui_code += f"\npyautogui.write({repr(stripped_content)}, interval=0.1)"
                     pyautogui_code += f"\ntime.sleep(0.5)\n"
                     if content.endswith("\n") or content.endswith("\\n"):
                         pyautogui_code += f"\npyautogui.press('enter')"
@@ -426,11 +426,11 @@ def parsing_response_to_pyautogui_code(responses,
             start_box = action_inputs.get("start_box")
             end_box = action_inputs.get("end_box")
             if start_box and end_box:
-                x1, y1, x2, y2 = eval(
+                x1, y1, x2, y2 = ast.literal_eval(
                     start_box)  # Assuming box is in [x1, y1, x2, y2]
                 sx = round(float((x1 + x2) / 2) * image_width, 3)
                 sy = round(float((y1 + y2) / 2) * image_height, 3)
-                x1, y1, x2, y2 = eval(
+                x1, y1, x2, y2 = ast.literal_eval(
                     end_box)  # Assuming box is in [x1, y1, x2, y2]
                 ex = round(float((x1 + x2) / 2) * image_width, 3)
                 ey = round(float((y1 + y2) / 2) * image_height, 3)
@@ -442,7 +442,7 @@ def parsing_response_to_pyautogui_code(responses,
             # Parsing scroll action
             start_box = action_inputs.get("start_box")
             if start_box:
-                x1, y1, x2, y2 = eval(
+                x1, y1, x2, y2 = ast.literal_eval(
                     start_box)  # Assuming box is in [x1, y1, x2, y2]
                 x = round(float((x1 + x2) / 2) * image_width, 3)
                 y = round(float((y1 + y2) / 2) * image_height, 3)
@@ -472,7 +472,7 @@ def parsing_response_to_pyautogui_code(responses,
             start_box = action_inputs.get("start_box")
             start_box = str(start_box)
             if start_box:
-                start_box = eval(start_box)
+                start_box = ast.literal_eval(start_box)
                 if len(start_box) == 4:
                     x1, y1, x2, y2 = start_box  # Assuming box is in [x1, y1, x2, y2]
                 elif len(start_box) == 2:

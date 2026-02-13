@@ -59,13 +59,14 @@ print(pyautogui_code)
 ### Visualize coordinates on the image (optional)
 
 ```python
+import ast
 from PIL import Image, ImageDraw
 import numpy as np
 import matplotlib.pyplot as plt
 
 image = Image.open("your_image_path.png")
 start_box = parsed_dict[0]["action_inputs"]["start_box"]
-coordinates = eval(start_box)
+coordinates = ast.literal_eval(start_box)
 x1 = int(coordinates[0] * original_image_width)
 y1 = int(coordinates[1] * original_image_height)
 draw = ImageDraw.Draw(image)
