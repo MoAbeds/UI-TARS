@@ -78,6 +78,32 @@ def escape_single_quotes(text):
     return re.sub(pattern, r"\\'", text)
 
 
+# Allowlist of valid action types to reject unexpected/malicious inputs
+VALID_ACTION_TYPES = frozenset({
+    "hotkey", "press", "keydown", "release", "keyup", "type",
+    "drag", "select", "scroll",
+    "click", "left_single", "left_double", "right_single", "hover",
+    "finished", "wait", "open_app", "long_press", "press_home", "press_back",
+})
+
+
+def _safe_parse_box(box_str):
+    """Safely parse a bounding box string into a tuple of numbers.
+
+    Only accepts lists/tuples of ints/floats with 2 or 4 elements.
+    Raises ValueError for any other input.
+    """
+    parsed = ast.literal_eval(box_str)
+    if not isinstance(parsed, (list, tuple)):
+        raise ValueError(f"Expected list or tuple, got {type(parsed).__name__}")
+    if len(parsed) not in (2, 4):
+        raise ValueError(f"Expected 2 or 4 coordinates, got {len(parsed)}")
+    for i, v in enumerate(parsed):
+        if not isinstance(v, (int, float)):
+            raise ValueError(f"Coordinate {i} is not numeric: {type(v).__name__}")
+    return tuple(parsed)
+
+
 def round_by_factor(number: int, factor: int) -> int:
     """Returns the closest integer to 'number' that is divisible by 'factor'."""
     return round(number / factor) * factor
@@ -311,13 +337,20 @@ def parsing_response_to_pyautogui_code(responses,
             thought = ""
 
         if response_id == 0:
-            pyautogui_code += f"'''\nObservation:\n{observation}\n\nThought:\n{thought}\n'''\n"
+            # Sanitize observation/thought to prevent triple-quote escape injection
+            safe_observation = str(observation).replace("'''", "---")
+            safe_thought = str(thought).replace("'''", "---")
+            pyautogui_code += f"'''\nObservation:\n{safe_observation}\n\nThought:\n{safe_thought}\n'''\n"
         else:
             pyautogui_code += f"\ntime.sleep(1)\n"
 
         action_dict = response
         action_type = action_dict.get("action_type")
         action_inputs = action_dict.get("action_inputs", {})
+
+        # Validate action_type against allowlist
+        if action_type and action_type not in VALID_ACTION_TYPES:
+            raise ValueError(f"Unknown action type: {re.sub(r'[^a-zA-Z0-9_]', '', str(action_type))}")
 
         if action_type == "hotkey":
             # Parsing hotkey action
@@ -426,11 +459,11 @@ def parsing_response_to_pyautogui_code(responses,
             start_box = action_inputs.get("start_box")
             end_box = action_inputs.get("end_box")
             if start_box and end_box:
-                x1, y1, x2, y2 = ast.literal_eval(
+                x1, y1, x2, y2 = _safe_parse_box(
                     start_box)  # Assuming box is in [x1, y1, x2, y2]
                 sx = round(float((x1 + x2) / 2) * image_width, 3)
                 sy = round(float((y1 + y2) / 2) * image_height, 3)
-                x1, y1, x2, y2 = ast.literal_eval(
+                x1, y1, x2, y2 = _safe_parse_box(
                     end_box)  # Assuming box is in [x1, y1, x2, y2]
                 ex = round(float((x1 + x2) / 2) * image_width, 3)
                 ey = round(float((y1 + y2) / 2) * image_height, 3)
@@ -442,7 +475,7 @@ def parsing_response_to_pyautogui_code(responses,
             # Parsing scroll action
             start_box = action_inputs.get("start_box")
             if start_box:
-                x1, y1, x2, y2 = ast.literal_eval(
+                x1, y1, x2, y2 = _safe_parse_box(
                     start_box)  # Assuming box is in [x1, y1, x2, y2]
                 x = round(float((x1 + x2) / 2) * image_width, 3)
                 y = round(float((y1 + y2) / 2) * image_height, 3)
@@ -472,7 +505,7 @@ def parsing_response_to_pyautogui_code(responses,
             start_box = action_inputs.get("start_box")
             start_box = str(start_box)
             if start_box:
-                start_box = ast.literal_eval(start_box)
+                start_box = _safe_parse_box(start_box)
                 if len(start_box) == 4:
                     x1, y1, x2, y2 = start_box  # Assuming box is in [x1, y1, x2, y2]
                 elif len(start_box) == 2:
@@ -494,7 +527,9 @@ def parsing_response_to_pyautogui_code(responses,
             pyautogui_code = f"DONE"
 
         else:
-            pyautogui_code += f"\n# Unrecognized action type: {action_type}"
+            # Sanitize action_type before embedding in generated code comment
+            safe_action_type = re.sub(r'[^a-zA-Z0-9_]', '', str(action_type))
+            pyautogui_code += f"\n# Unrecognized action type: {safe_action_type}"
 
     return pyautogui_code
 
